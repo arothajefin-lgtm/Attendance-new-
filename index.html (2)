@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="ml">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Apollo Tracker Pro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    
+    <link rel="manifest" href="data:application/manifest+json,{%22name%22:%22Apollo%20Tracker%22,%22short_name%22:%22Apollo%22,%22start_url%22:%22.%22,%22display%22:%22standalone%22,%22background_color%22:%22%23ffffff%22,%22theme_color%22:%22%23e11d48%22}">
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; color: #1f2937; -webkit-tap-highlight-color: transparent; }
+        .shift-a { background-color: #dcfce7 !important; color: #15803d !important; border: 2.5px solid #15803d !important; }
+        .shift-b { background-color: #dbeafe !important; color: #1d4ed8 !important; border: 2.5px solid #1d4ed8 !important; }
+        .shift-c { background-color: #fef9c3 !important; color: #a16207 !important; border: 2.5px solid #a16207 !important; }
+        .shift-off { background-color: #f3f4f6 !important; color: #4b5563 !important; border: 2.5px solid #4b5563 !important; }
+        .shift-leave { background-color: #fee2e2 !important; color: #b91c1c !important; border: 2.5px solid #b91c1c !important; }
+        .shift-holiday { background-color: #f5f3ff !important; color: #6d28d9 !important; border: 2.5px solid #6d28d9 !important; }
+        .calendar-day { aspect-ratio: 1 / 1.2; display: flex; flex-direction: column; align-items: center; justify-content: center; background: white; border: 1px solid #e5e7eb; cursor: pointer; border-radius: 14px; margin: 2px; position: relative; }
+        .ot-label { position: absolute; top: 2px; right: 4px; color: #ea580c; font-size: 8px; font-weight: 900; }
+        .shift-tag { font-size: 9px; font-weight: 900; margin-top: 2px; text-transform: uppercase; }
+        .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); justify-content: center; align-items: center; z-index: 50; backdrop-filter: blur(4px); }
+        .modal.active { display: flex; }
+    </style>
+</head>
+<body class="pb-10">
+
+    <header class="bg-white p-4 shadow-sm flex justify-between items-center sticky top-0 z-40">
+        <div class="flex items-center gap-2">
+            <div class="w-9 h-9 bg-rose-600 rounded-lg text-white flex items-center justify-center font-black text-xl shadow-lg">A</div>
+            <div>
+                <h1 class="font-extrabold text-gray-800 leading-none">Apollo Tyres</h1>
+                <p class="text-[10px] text-gray-400 font-bold uppercase tracking-tighter">Attendance Pro</p>
+            </div>
+        </div>
+        <button onclick="openSettings()" class="p-2 bg-gray-100 rounded-xl text-lg">⚙️</button>
+    </header>
+
+    <main class="max-w-md mx-auto px-3 mt-4" id="pdfArea">
+        <div class="flex justify-between items-center mb-4 bg-white p-2 rounded-2xl shadow-sm border border-gray-100 no-pdf">
+            <button onclick="changeMonth(-1)" class="w-10 h-10 flex items-center justify-center bg-gray-50 rounded-xl text-rose-600 font-bold">←</button>
+            <h2 id="monthDisplay" class="font-extrabold text-gray-700"></h2>
+            <button onclick="changeMonth(1)" class="w-10 h-10 flex items-center justify-center bg-gray-50 rounded-xl text-rose-600 font-bold">→</button>
+        </div>
+        
+        <div id="calendarGrid" class="bg-white rounded-3xl shadow-sm p-3 mb-6 border border-gray-100 grid grid-cols-7 text-center text-xs"></div>
+        
+        <div class="bg-white p-5 rounded-3xl shadow-sm border-l-8 border-rose-500 mb-6">
+            <div class="grid grid-cols-5 gap-2 text-[10px] font-bold text-center">
+                <div class="p-2 bg-blue-50 rounded-lg text-blue-700">DUTY<p id="statDuty" class="text-lg font-black">0</p></div>
+                <div class="p-2 bg-orange-50 rounded-lg text-orange-700">OT<p id="statOt" class="text-lg font-black">0</p></div>
+                <div class="p-2 bg-gray-50 rounded-lg text-gray-700">OFF<p id="statOff" class="text-lg font-black">0</p></div>
+                <div class="p-2 bg-purple-50 rounded-lg text-purple-700">HOLI<p id="statHoliday" class="text-lg font-black">0</p></div>
+                <div class="p-2 bg-red-50 rounded-lg text-red-700">LEAVE<p id="statLeave" class="text-lg font-black">0</p></div>
+            </div>
+        </div>
+
+        <div class="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 mb-6 no-pdf">
+            <canvas id="attendanceChart" height="200"></canvas>
+        </div>
+    </main>
+
+    <div id="settingsModal" class="modal px-4">
+        <div class="bg-white w-full max-w-sm rounded-[2rem] p-7 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="font-black text-xl flex-1 text-center ml-10">⚙️ Settings</h3>
+                <button onclick="toggleBotMenu()" class="w-10 h-10 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center text-xl border border-blue-100 shadow-sm">🤖</button>
+            </div>
+            
+            <div id="botMenu" class="hidden bg-blue-50 rounded-2xl mb-5 border border-blue-100 overflow-hidden">
+                <a href="https://t.me/userinfo3bot" target="_blank" class="block p-3 text-[10px] font-bold text-blue-700 border-b border-blue-100">🔍 Find My Chat ID</a>
+                <a href="https://t.me/Jefin143_bot" target="_blank" class="block p-3 text-[10px] font-bold text-blue-700">🤖 Open Backup Bot</a>
+            </div>
+
+            <div class="p-4 bg-gray-50 rounded-2xl border border-gray-200 mb-4">
+                <h4 class="font-bold text-[10px] text-gray-400 mb-3 uppercase tracking-widest">Range Analysis</h4>
+                <div class="flex gap-2 mb-3">
+                    <input type="month" id="rangeFrom" class="w-1/2 p-2 text-xs border rounded-lg outline-none">
+                    <input type="month" id="rangeTo" class="w-1/2 p-2 text-xs border rounded-lg outline-none">
+                </div>
+                <button onclick="calculateRange()" class="w-full py-2 bg-slate-800 text-white rounded-lg font-black text-xs">Analyze Range</button>
+                <div id="rangeResults" class="hidden mt-3 grid grid-cols-2 gap-2 text-[10px] font-bold p-3 bg-white rounded-xl border">
+                    <p>Duty: <span id="rDuty" class="text-blue-600">0</span></p><p>OT: <span id="rOt" class="text-orange-600">0</span></p>
+                    <p>Off: <span id="rOff" class="text-gray-600">0</span></p><p>Holi: <span id="rHoliday" class="text-purple-600">0</span></p>
+                    <p class="col-span-2 text-center mt-1 pt-1 border-t text-red-600">Leave: <span id="rLeave">0</span></p>
+                </div>
+            </div>
+
+            <div class="p-4 bg-rose-50 rounded-2xl border border-rose-100 mb-4 text-center">
+                <button id="pdfBtn" onclick="exportToPDF()" class="w-full py-3 bg-rose-600 text-white rounded-xl font-black">📄 Download PDF Report</button>
+            </div>
+
+            <div class="p-4 bg-indigo-50 rounded-2xl border border-indigo-100 mb-4">
+                <input type="text" id="userChatId" class="w-full p-2 mb-2 text-xs border rounded-lg outline-none" placeholder="Enter Chat ID">
+                <button onclick="saveChatId()" class="w-full py-2 bg-indigo-500 text-white rounded-lg font-bold text-xs mb-2">Save ID</button>
+                <button onclick="backupToTelegram()" class="w-full py-3 bg-indigo-700 text-white rounded-xl font-black">📤 Backup to Telegram</button>
+            </div>
+
+            <button onclick="closeModal('settingsModal')" class="w-full py-3 bg-gray-100 text-gray-500 rounded-xl font-black">Close</button>
+        </div>
+    </div>
+
+    <div id="dayModal" class="modal px-4">
+        <div class="bg-white w-full max-w-sm rounded-[2rem] p-6 shadow-2xl">
+            <h3 id="selectedDateTitle" class="font-black text-xl mb-4 text-center"></h3>
+            <div class="grid grid-cols-3 gap-2 mb-4">
+                <button onclick="setShift('A', this)" class="shift-btn p-3 rounded-xl border-2 border-gray-100 bg-gray-50 text-xs font-bold">A</button>
+                <button onclick="setShift('B', this)" class="shift-btn p-3 rounded-xl border-2 border-gray-100 bg-gray-50 text-xs font-bold">B</button>
+                <button onclick="setShift('C', this)" class="shift-btn p-3 rounded-xl border-2 border-gray-100 bg-gray-50 text-xs font-bold">C</button>
+                <button onclick="setShift('OFF', this)" class="shift-btn p-3 rounded-xl border-2 border-gray-100 bg-gray-50 text-xs font-bold">OFF</button>
+                <button onclick="setShift('LEAVE', this)" class="shift-btn p-3 rounded-xl border-2 border-gray-100 bg-gray-50 text-xs font-bold text-red-600">LEAVE</button>
+                <button onclick="setShift('HOLIDAY', this)" class="shift-btn p-3 rounded-xl border-2 border-gray-100 bg-gray-50 text-xs font-bold text-purple-600">HOLI</button>
+            </div>
+            <label class="flex items-center gap-2 p-3 bg-orange-50 rounded-xl border border-orange-200 mb-4 cursor-pointer">
+                <input type="checkbox" id="otCheck" class="w-5 h-5 accent-orange-600">
+                <span class="text-sm font-bold text-orange-900">Over Time (OT)</span>
+            </label>
+            <textarea id="dayNote" class="w-full p-3 bg-gray-50 border-2 border-gray-100 rounded-xl text-sm mb-4 outline-none" placeholder="Notes..."></textarea>
+            <div class="flex gap-2">
+                <button onclick="deleteEntry()" class="w-1/4 text-red-400 font-bold text-sm">Clear</button>
+                <button onclick="saveAttendance()" class="w-3/4 py-3 bg-rose-600 text-white rounded-xl font-black shadow-lg">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- OFFLINE SUPPORT (Service Worker) ---
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                const swCode = `
+                    const CACHE_NAME = 'apollo-v1';
+                    const ASSETS = [
+                        '${window.location.href}',
+                        'https://cdn.tailwindcss.com',
+                        'https://cdn.jsdelivr.net/npm/chart.js',
+                        'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js'
+                    ];
+                    self.addEventListener('install', e => {
+                        e.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS)));
+                    });
+                    self.addEventListener('fetch', e => {
+                        e.respondWith(caches.match(e.request).then(res => res || fetch(e.request)));
+                    });
+                `;
+                const blob = new Blob([swCode], {type: 'application/javascript'});
+                navigator.serviceWorker.register(URL.createObjectURL(blob));
+            });
+        }
+
+        const commonBotToken = '7909722913:AAEQhIp7o5WhVSZUjgLYA8qAO25FPmj6s0o'; 
+        let currentDate = new Date();
+        let attendanceData = JSON.parse(localStorage.getItem('apollo_attendance') || '{}');
+        let selectedKey = null, activeShift = null, myChart = null;
+        const monthsML = ["ജനുവരി", "ഫെബ്രുവരി", "മാർച്ച്", "ഏപ്രിൽ", "മേയ്", "ജൂൺ", "ജൂലൈ", "ഓഗസ്റ്റ്", "സെപ്റ്റംബർ", "ഒക്ടോബർ", "നവംബർ", "ഡിസംബർ"];
+
+        function toggleBotMenu() { document.getElementById('botMenu').classList.toggle('hidden'); }
+        function renderCalendar() {
+            const grid = document.getElementById('calendarGrid');
+            const year = currentDate.getFullYear(), month = currentDate.getMonth();
+            document.getElementById('monthDisplay').innerText = `${monthsML[month]} ${year}`;
+            grid.innerHTML = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d => `<div class="font-black text-gray-400 py-2 uppercase">${d}</div>`).join('');
+            const first = new Date(year, month, 1).getDay(), days = new Date(year, month + 1, 0).getDate();
+            for (let i = 0; i < first; i++) grid.appendChild(document.createElement('div'));
+            for (let d = 1; d <= days; d++) {
+                const key = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                let data = attendanceData[key];
+                const el = document.createElement('div');
+                el.className = `calendar-day ${data ? 'shift-' + data.shift.toLowerCase() : ''}`;
+                let label = data ? (data.shift === 'LEAVE' ? 'L' : data.shift === 'HOLIDAY' ? 'HD' : data.shift) : '';
+                let hasOt = data && (data.ot === true || (typeof data.ot === 'string' && data.ot.length > 0));
+                el.innerHTML = `<span class="text-sm font-black">${d}</span><span class="shift-tag">${label}</span>${hasOt ? '<span class="ot-label">OT</span>' : ''}`;
+                el.onclick = () => openDay(key, d);
+                grid.appendChild(el);
+            }
+            updateStatsAndGraph();
+        }
+
+        function updateStatsAndGraph() {
+            const m = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`;
+            let s = { d: 0, o: 0, off: 0, h: 0, l: 0 };
+            Object.keys(attendanceData).forEach(k => { if(k.startsWith(m)) { 
+                const d = attendanceData[k]; 
+                if(['A','B','C'].includes(d.shift)) s.d++; 
+                if(d.ot === true || (typeof d.ot === 'string' && d.ot.length > 0)) s.o++; 
+                if(d.shift==='OFF') s.off++; if(d.shift==='HOLIDAY') s.h++; if(d.shift==='LEAVE') s.l++; 
+            }});
+            document.getElementById('statDuty').innerText=s.d; document.getElementById('statOt').innerText=s.o;
+            document.getElementById('statOff').innerText=s.off; document.getElementById('statHoliday').innerText=s.h; document.getElementById('statLeave').innerText=s.l;
+            const ctx = document.getElementById('attendanceChart').getContext('2d');
+            if (myChart) myChart.destroy();
+            myChart = new Chart(ctx, { type: 'doughnut', data: { labels: ['Duty', 'Off', 'Holiday', 'Leave'], datasets: [{ data: [s.d, s.off, s.h, s.l], backgroundColor: ['#2563eb', '#9ca3af', '#9333ea', '#ef4444'], borderWidth: 0, cutout: '75%' }] }, options: { plugins: { legend: { position: 'bottom' } } } });
+        }
+
+        async function exportToPDF() {
+            const btn = document.getElementById('pdfBtn');
+            btn.innerText = "⏳ Generating..."; btn.disabled = true;
+            try {
+                await html2pdf().set({ margin: 10, filename: `Apollo_Report.pdf`, html2canvas: { scale: 2 }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' } }).from(document.getElementById('pdfArea')).save();
+                btn.innerText = "✅ Downloaded!";
+                setTimeout(() => { btn.innerText = "📄 Download PDF Report"; btn.disabled = false; }, 2000);
+            } catch (e) { alert("Error!"); btn.disabled = false; }
+        }
+
+        function openDay(key, d) { 
+            selectedKey = key; const data = attendanceData[key] || {}; 
+            document.getElementById('selectedDateTitle').innerText = `${d} ${monthsML[currentDate.getMonth()]}`; 
+            document.getElementById('otCheck').checked = (data.ot === true || (typeof data.ot === 'string' && data.ot.length > 0)); 
+            document.getElementById('dayNote').value = data.note || ''; 
+            activeShift = data.shift || null; 
+            document.querySelectorAll('.shift-btn').forEach(b => b.style.borderColor = b.innerText.split(' ')[0] === activeShift ? '#e11d48' : '#f3f4f6'); 
+            document.getElementById('dayModal').classList.add('active'); 
+        }
+
+        function setShift(s, btn) { activeShift = s; document.querySelectorAll('.shift-btn').forEach(b => b.style.borderColor = '#f3f4f6'); btn.style.borderColor = '#e11d48'; }
+        function saveAttendance() { 
+            if(!activeShift) return alert("Select Shift"); 
+            let otValue = document.getElementById('otCheck').checked ? `${activeShift}-Ot` : "";
+            attendanceData[selectedKey] = { shift: activeShift, ot: otValue, note: document.getElementById('dayNote').value }; 
+            localStorage.setItem('apollo_attendance', JSON.stringify(attendanceData)); renderCalendar(); closeModal('dayModal'); 
+        }
+
+        function calculateRange() {
+            const f = document.getElementById('rangeFrom').value, t = document.getElementById('rangeTo').value;
+            if(!f || !t) return alert("Select months");
+            let s = { d:0, o:0, off:0, h:0, l:0 };
+            Object.keys(attendanceData).forEach(k => { 
+                const m = k.substring(0,7); 
+                if(m >= f && m <= t) { 
+                    const d = attendanceData[k]; 
+                    if(['A','B','C'].includes(d.shift)) s.d++; 
+                    if(d.ot === true || (typeof d.ot === 'string' && d.ot.length > 0)) s.o++; 
+                    if(d.shift==='OFF') s.off++; if(d.shift==='HOLIDAY') s.h++; if(d.shift==='LEAVE') s.l++; 
+                } 
+            });
+            document.getElementById('rDuty').innerText=s.d; document.getElementById('rOt').innerText=s.o;
+            document.getElementById('rOff').innerText=s.off; document.getElementById('rHoliday').innerText=s.h; document.getElementById('rLeave').innerText=s.l;
+            document.getElementById('rangeResults').classList.remove('hidden');
+        }
+
+        function deleteEntry() { if(confirm("Delete?")) { delete attendanceData[selectedKey]; localStorage.setItem('apollo_attendance', JSON.stringify(attendanceData)); renderCalendar(); closeModal('dayModal'); } }
+        function saveChatId() { localStorage.setItem('apollo_chat_id', document.getElementById('userChatId').value); alert("ID Saved!"); }
+        async function backupToTelegram() {
+            const id = localStorage.getItem('apollo_chat_id'); if(!id) return alert("ID Missing!");
+            const fileHTML = `<!DOCTYPE html><html><body><div id="dataStore" style="display:none;">${JSON.stringify({attendance: JSON.stringify(attendanceData), chatId: id})}</div></body></html>`;
+            const formData = new FormData(); formData.append('chat_id', id); formData.append('document', new Blob([fileHTML], {type:'text/html'}), `Apollo_Backup.html`);
+            const res = await fetch(`https://api.telegram.org/bot${commonBotToken}/sendDocument`, {method:'POST', body:formData});
+            if(res.ok) alert("Sent!"); else alert("Offline/Error!");
+        }
+        function changeMonth(d) { currentDate.setMonth(currentDate.getMonth() + d); renderCalendar(); }
+        function openSettings() { document.getElementById('settingsModal').classList.add('active'); }
+        function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+        window.onload = () => { renderCalendar(); document.getElementById('userChatId').value = localStorage.getItem('apollo_chat_id') || ''; };
+    </script>
+</body>
+</html>
+    
