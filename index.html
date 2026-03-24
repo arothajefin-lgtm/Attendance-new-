@@ -98,6 +98,15 @@
                 <button onclick="saveChatId()" class="w-full py-2 bg-indigo-500 text-white rounded-lg font-bold text-xs mb-2">Save ID</button>
                 <button onclick="backupToTelegram()" class="w-full py-3 bg-indigo-700 text-white rounded-xl font-black">📤 Backup to Telegram</button>
             </div>
+            
+            <div class="mt-4 p-4 bg-green-50 rounded-2xl border border-green-200 text-center">
+    <input type="file" id="restoreFile" class="hidden" accept=".html" onchange="handleRestore(event)">
+    <button onclick="document.getElementById('restoreFile').click()" class="w-full py-3 bg-white border-2 border-green-300 text-green-700 rounded-xl font-black text-xs hover:bg-green-100 flex items-center justify-center gap-2">
+        <span>📥</span> Restore Backup File
+    </button>
+    <p class="text-[8px] text-gray-400 mt-2 italic">നിങ്ങളുടെ പഴയ ബാക്കപ്പ് ഫയൽ ഇവിടെ അപ്‌ലോഡ് ചെയ്യുക.</p>
+</div>
+
 
             <button onclick="closeModal('settingsModal')" class="w-full py-3 bg-gray-100 text-gray-500 rounded-xl font-black">Close</button>
         </div>
@@ -239,6 +248,29 @@
             document.getElementById('rOff').innerText=s.off; document.getElementById('rHoliday').innerText=s.h; document.getElementById('rLeave').innerText=s.l;
             document.getElementById('rangeResults').classList.remove('hidden');
         }
+        function handleRestore(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const doc = new DOMParser().parseFromString(e.target.result, 'text/html');
+            const rawData = doc.getElementById('dataStore').innerText;
+            let parsed = JSON.parse(rawData);
+            
+            // ഡാറ്റ സേവ് ചെയ്യുന്നു
+            localStorage.setItem('apollo_attendance', parsed.attendance || rawData);
+            if(parsed.chatId) localStorage.setItem('apollo_chat_id', parsed.chatId);
+            
+            alert('വിജയകരമായി Restore ചെയ്തു! ✅'); 
+            location.reload(); // ആപ്പ് റിഫ്രഷ് ചെയ്യാൻ
+        } catch(err) { 
+            alert('Invalid File! ശരിയായ ബാക്കപ്പ് ഫയൽ തിരഞ്ഞെടുക്കുക. ❌'); 
+        }
+    };
+    reader.readAsText(file);
+}
 
         function deleteEntry() { if(confirm("Delete?")) { delete attendanceData[selectedKey]; localStorage.setItem('apollo_attendance', JSON.stringify(attendanceData)); renderCalendar(); closeModal('dayModal'); } }
         function saveChatId() { localStorage.setItem('apollo_chat_id', document.getElementById('userChatId').value); alert("ID Saved!"); }
