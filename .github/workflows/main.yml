@@ -30,19 +30,21 @@ jobs:
       - name: Create Cordova Project
         run: |
           cordova create myApp com.arothajefin.myapp MyApp
-          # നിങ്ങളുടെ HTML ഫയലുകൾ Cordova-യുടെ www ഫോൾഡറിലേക്ക് മാറ്റുന്നു
           cp -r * myApp/www/ || true
           cd myApp
           cordova platform add android
+          # Debugging: ഫയലുകൾ ലിസ്റ്റ് ചെയ്യുന്നു
+          ls -R
 
       - name: Build Android APK
         run: |
           cd myApp
-          # Release APK ബിൽഡ് ചെയ്യുന്നു
-          cordova build android --release -- --gradleArg=-Pandroid.useAndroidX=true --gradleArg=-Pandroid.enableJetifier=true
+          # സാധാരണ ബിൽഡ് പരീക്ഷിക്കുന്നു
+          cordova build android
 
-      - name: Upload APK Artifact
+      - name: Find and Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: my-app-apk
-          path: myApp/platforms/android/app/build/outputs/apk/release/*.apk
+          # ഏത് ഫോൾഡറിൽ ഉണ്ടെങ്കിലും APK കണ്ടുപിടിക്കാനുള്ള വഴി
+          path: "**/platforms/android/app/build/outputs/apk/debug/*.apk"
