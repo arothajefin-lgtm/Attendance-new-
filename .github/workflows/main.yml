@@ -29,22 +29,24 @@ jobs:
 
       - name: Create Cordova Project
         run: |
-          cordova create myApp com.arothajefin.myapp MyApp
+          # "My App Name" എന്ന ഭാഗത്ത് നിങ്ങളുടെ ആപ്പിന്റെ പേര് നൽകുക
+          cordova create myApp com.arothajefin.myapp "My Attendance"
           cp -r * myApp/www/ || true
           cd myApp
+          # ഐക്കൺ ഫയൽ ഉണ്ടെങ്കിൽ അത് സെറ്റ് ചെയ്യാൻ
+          mkdir -p res
+          cp ../icon.png res/icon.png || true
+          # config.xml ഫയലിൽ ഐക്കൺ പാത്ത് ചേർക്കുന്നു
+          sed -i '/<\/widget>/i \    <icon src="res/icon.png" />' config.xml
           cordova platform add android
-          # Debugging: ഫയലുകൾ ലിസ്റ്റ് ചെയ്യുന്നു
-          ls -R
 
       - name: Build Android APK
         run: |
           cd myApp
-          # സാധാരണ ബിൽഡ് പരീക്ഷിക്കുന്നു
           cordova build android
 
       - name: Find and Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: my-app-apk
-          # ഏത് ഫോൾഡറിൽ ഉണ്ടെങ്കിലും APK കണ്ടുപിടിക്കാനുള്ള വഴി
           path: "**/platforms/android/app/build/outputs/apk/debug/*.apk"
