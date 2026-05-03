@@ -2,8 +2,8 @@
 <html lang="ml">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Apollo Tracker Pro</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
+    <title>Apollo Tracker Pro · Swipe Months</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
@@ -19,11 +19,38 @@
         .shift-off { background-color: #f3f4f6 !important; color: #4b5563 !important; border: 2.5px solid #4b5563 !important; }
         .shift-leave { background-color: #fee2e2 !important; color: #b91c1c !important; border: 2.5px solid #b91c1c !important; }
         .shift-holiday { background-color: #f5f3ff !important; color: #6d28d9 !important; border: 2.5px solid #6d28d9 !important; }
-        .calendar-day { aspect-ratio: 1 / 1.2; display: flex; flex-direction: column; align-items: center; justify-content: center; background: white; border: 1px solid #e5e7eb; cursor: pointer; border-radius: 14px; margin: 2px; position: relative; }
+        .calendar-day { aspect-ratio: 1 / 1.2; display: flex; flex-direction: column; align-items: center; justify-content: center; background: white; border: 1px solid #e5e7eb; cursor: pointer; border-radius: 14px; margin: 2px; position: relative; transition: all 0.1s ease; }
         .ot-label { position: absolute; top: 2px; right: 4px; color: #ea580c; font-size: 8px; font-weight: 900; }
         .shift-tag { font-size: 9px; font-weight: 900; margin-top: 2px; text-transform: uppercase; }
         .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); justify-content: center; align-items: center; z-index: 50; backdrop-filter: blur(4px); }
         .modal.active { display: flex; }
+        /* swipe hint indicator (optional) */
+        .swipe-hint-icon {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.6);
+            backdrop-filter: blur(12px);
+            color: white;
+            font-size: 11px;
+            padding: 6px 14px;
+            border-radius: 40px;
+            pointer-events: none;
+            z-index: 45;
+            font-weight: 500;
+            letter-spacing: 0.5px;
+            opacity: 0;
+            transition: opacity 0.3s;
+            white-space: nowrap;
+        }
+        .swipe-hint-icon.show {
+            opacity: 0.8;
+        }
+        /* calendar grid wrapper for smooth swipe area */
+        .swipe-calendar-area {
+            touch-action: pan-y pinch-zoom;
+        }
     </style>
 </head>
 <body class="pb-10">
@@ -33,7 +60,7 @@
             <div class="w-9 h-9 bg-rose-600 rounded-lg text-white flex items-center justify-center font-black text-xl shadow-lg">A</div>
             <div>
                 <h1 class="font-extrabold text-gray-800 leading-none">Apollo Tyres</h1>
-                <p class="text-[10px] text-gray-400 font-bold uppercase tracking-tighter">Attendance Pro</p>
+                <p class="text-[10px] text-gray-400 font-bold uppercase tracking-tighter">Swipe Months ↔️</p>
             </div>
         </div>
         <button onclick="openSettings()" class="p-2 bg-gray-100 rounded-xl text-lg">⚙️</button>
@@ -46,7 +73,10 @@
             <button onclick="changeMonth(1)" class="w-10 h-10 flex items-center justify-center bg-gray-50 rounded-xl text-rose-600 font-bold">→</button>
         </div>
         
-        <div id="calendarGrid" class="bg-white rounded-3xl shadow-sm p-3 mb-6 border border-gray-100 grid grid-cols-7 text-center text-xs"></div>
+        <!-- Swipe enabled calendar container -->
+        <div id="swipeCalendarZone" class="swipe-calendar-area">
+            <div id="calendarGrid" class="bg-white rounded-3xl shadow-sm p-3 mb-6 border border-gray-100 grid grid-cols-7 text-center text-xs"></div>
+        </div>
         
         <div class="bg-white p-5 rounded-3xl shadow-sm border-l-8 border-rose-500 mb-6">
             <div class="grid grid-cols-5 gap-2 text-[10px] font-bold text-center">
@@ -61,6 +91,9 @@
         <div class="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 mb-6 no-pdf">
             <canvas id="attendanceChart" height="200"></canvas>
         </div>
+        
+        <!-- tiny swipe helper text (auto hides) -->
+        <div id="swipeHelperToast" class="swipe-hint-icon">👈 Swipe left/right → change month  👉</div>
     </main>
 
     <div id="settingsModal" class="modal px-4">
@@ -100,13 +133,12 @@
             </div>
             
             <div class="mt-4 p-4 bg-green-50 rounded-2xl border border-green-200 text-center">
-    <input type="file" id="restoreFile" class="hidden" accept=".html" onchange="handleRestore(event)">
-    <button onclick="document.getElementById('restoreFile').click()" class="w-full py-3 bg-white border-2 border-green-300 text-green-700 rounded-xl font-black text-xs hover:bg-green-100 flex items-center justify-center gap-2">
-        <span>📥</span> Restore Backup File
-    </button>
-    <p class="text-[8px] text-gray-400 mt-2 italic">നിങ്ങളുടെ പഴയ ബാക്കപ്പ് ഫയൽ ഇവിടെ അപ്‌ലോഡ് ചെയ്യുക.</p>
-</div>
-
+                <input type="file" id="restoreFile" class="hidden" accept=".html" onchange="handleRestore(event)">
+                <button onclick="document.getElementById('restoreFile').click()" class="w-full py-3 bg-white border-2 border-green-300 text-green-700 rounded-xl font-black text-xs hover:bg-green-100 flex items-center justify-center gap-2">
+                    <span>📥</span> Restore Backup File
+                </button>
+                <p class="text-[8px] text-gray-400 mt-2 italic">നിങ്ങളുടെ പഴയ ബാക്കപ്പ് ഫയൽ ഇവിടെ അപ്‌ലോഡ് ചെയ്യുക.</p>
+            </div>
 
             <button onclick="closeModal('settingsModal')" class="w-full py-3 bg-gray-100 text-gray-500 rounded-xl font-black">Close</button>
         </div>
@@ -136,11 +168,18 @@
     </div>
 
     <script>
-        // --- OFFLINE SUPPORT (Service Worker) ---
+        // --- existing core logic + SWIPE integration ---
+        const commonBotToken = '7909722913:AAEQhIp7o5WhVSZUjgLYA8qAO25FPmj6s0o'; 
+        let currentDate = new Date();
+        let attendanceData = JSON.parse(localStorage.getItem('apollo_attendance') || '{}');
+        let selectedKey = null, activeShift = null, myChart = null;
+        const monthsML = ["ജനുവരി", "ഫെബ്രുവരി", "മാർച്ച്", "ഏപ്രിൽ", "മേയ്", "ജൂൺ", "ജൂലൈ", "ഓഗസ്റ്റ്", "സെപ്റ്റംബർ", "ഒക്ടോബർ", "നവംബർ", "ഡിസംബർ"];
+
+        // ----- SERVICE WORKER (offline capability) -----
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 const swCode = `
-                    const CACHE_NAME = 'apollo-v1';
+                    const CACHE_NAME = 'apollo-v2-swipe';
                     const ASSETS = [
                         '${window.location.href}',
                         'https://cdn.tailwindcss.com',
@@ -155,17 +194,13 @@
                     });
                 `;
                 const blob = new Blob([swCode], {type: 'application/javascript'});
-                navigator.serviceWorker.register(URL.createObjectURL(blob));
+                navigator.serviceWorker.register(URL.createObjectURL(blob)).catch(err => console.log("sw err", err));
             });
         }
 
-        const commonBotToken = '7909722913:AAEQhIp7o5WhVSZUjgLYA8qAO25FPmj6s0o'; 
-        let currentDate = new Date();
-        let attendanceData = JSON.parse(localStorage.getItem('apollo_attendance') || '{}');
-        let selectedKey = null, activeShift = null, myChart = null;
-        const monthsML = ["ജനുവരി", "ഫെബ്രുവരി", "മാർച്ച്", "ഏപ്രിൽ", "മേയ്", "ജൂൺ", "ജൂലൈ", "ഓഗസ്റ്റ്", "സെപ്റ്റംബർ", "ഒക്ടോബർ", "നവംബർ", "ഡിസംബർ"];
-
+        // ----- helper functions (render, stats, etc) -----
         function toggleBotMenu() { document.getElementById('botMenu').classList.toggle('hidden'); }
+        
         function renderCalendar() {
             const grid = document.getElementById('calendarGrid');
             const year = currentDate.getFullYear(), month = currentDate.getMonth();
@@ -181,7 +216,7 @@
                 let label = data ? (data.shift === 'LEAVE' ? 'L' : data.shift === 'HOLIDAY' ? 'HD' : data.shift) : '';
                 let hasOt = data && (data.ot === true || (typeof data.ot === 'string' && data.ot.length > 0));
                 el.innerHTML = `<span class="text-sm font-black">${d}</span><span class="shift-tag">${label}</span>${hasOt ? '<span class="ot-label">OT</span>' : ''}`;
-                el.onclick = () => openDay(key, d);
+                el.onclick = (function(k, dayNum) { return function() { openDay(k, dayNum); }; })(key, d);
                 grid.appendChild(el);
             }
             updateStatsAndGraph();
@@ -219,11 +254,12 @@
             document.getElementById('otCheck').checked = (data.ot === true || (typeof data.ot === 'string' && data.ot.length > 0)); 
             document.getElementById('dayNote').value = data.note || ''; 
             activeShift = data.shift || null; 
-            document.querySelectorAll('.shift-btn').forEach(b => b.style.borderColor = b.innerText.split(' ')[0] === activeShift ? '#e11d48' : '#f3f4f6'); 
+            document.querySelectorAll('.shift-btn').forEach(b => b.style.borderColor = (b.innerText.split(' ')[0] === activeShift) ? '#e11d48' : '#f3f4f6'); 
             document.getElementById('dayModal').classList.add('active'); 
         }
 
         function setShift(s, btn) { activeShift = s; document.querySelectorAll('.shift-btn').forEach(b => b.style.borderColor = '#f3f4f6'); btn.style.borderColor = '#e11d48'; }
+        
         function saveAttendance() { 
             if(!activeShift) return alert("Select Shift"); 
             let otValue = document.getElementById('otCheck').checked ? `${activeShift}-Ot` : "";
@@ -248,44 +284,159 @@
             document.getElementById('rOff').innerText=s.off; document.getElementById('rHoliday').innerText=s.h; document.getElementById('rLeave').innerText=s.l;
             document.getElementById('rangeResults').classList.remove('hidden');
         }
+        
         function handleRestore(event) {
-    const file = event.target.files[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = function(e) {
-        try {
-            const doc = new DOMParser().parseFromString(e.target.result, 'text/html');
-            const rawData = doc.getElementById('dataStore').innerText;
-            let parsed = JSON.parse(rawData);
-            
-            // ഡാറ്റ സേവ് ചെയ്യുന്നു
-            localStorage.setItem('apollo_attendance', parsed.attendance || rawData);
-            if(parsed.chatId) localStorage.setItem('apollo_chat_id', parsed.chatId);
-            
-            alert('വിജയകരമായി Restore ചെയ്തു! ✅'); 
-            location.reload(); // ആപ്പ് റിഫ്രഷ് ചെയ്യാൻ
-        } catch(err) { 
-            alert('Invalid File! ശരിയായ ബാക്കപ്പ് ഫയൽ തിരഞ്ഞെടുക്കുക. ❌'); 
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const doc = new DOMParser().parseFromString(e.target.result, 'text/html');
+                    const rawData = doc.getElementById('dataStore').innerText;
+                    let parsed = JSON.parse(rawData);
+                    localStorage.setItem('apollo_attendance', parsed.attendance || rawData);
+                    if(parsed.chatId) localStorage.setItem('apollo_chat_id', parsed.chatId);
+                    alert('✅ Restore successful! Reloading...'); 
+                    location.reload();
+                } catch(err) { alert('❌ Invalid backup file'); }
+            };
+            reader.readAsText(file);
         }
-    };
-    reader.readAsText(file);
-}
 
         function deleteEntry() { if(confirm("Delete?")) { delete attendanceData[selectedKey]; localStorage.setItem('apollo_attendance', JSON.stringify(attendanceData)); renderCalendar(); closeModal('dayModal'); } }
         function saveChatId() { localStorage.setItem('apollo_chat_id', document.getElementById('userChatId').value); alert("ID Saved!"); }
+        
         async function backupToTelegram() {
             const id = localStorage.getItem('apollo_chat_id'); if(!id) return alert("ID Missing!");
             const fileHTML = `<!DOCTYPE html><html><body><div id="dataStore" style="display:none;">${JSON.stringify({attendance: JSON.stringify(attendanceData), chatId: id})}</div></body></html>`;
             const formData = new FormData(); formData.append('chat_id', id); formData.append('document', new Blob([fileHTML], {type:'text/html'}), `Apollo_Backup.html`);
             const res = await fetch(`https://api.telegram.org/bot${commonBotToken}/sendDocument`, {method:'POST', body:formData});
-            if(res.ok) alert("Sent!"); else alert("Offline/Error!");
+            if(res.ok) alert("✅ Backup sent!"); else alert("⚠️ Failed. Check ID/internet.");
         }
-        function changeMonth(d) { currentDate.setMonth(currentDate.getMonth() + d); renderCalendar(); }
+        
+        function changeMonth(delta) { 
+            currentDate.setMonth(currentDate.getMonth() + delta); 
+            renderCalendar(); 
+            // small haptic-like visual feedback (optional)
+            const grid = document.getElementById('calendarGrid');
+            grid.style.transform = 'scale(0.99)';
+            setTimeout(() => { grid.style.transform = ''; }, 120);
+        }
+        
         function openSettings() { document.getElementById('settingsModal').classList.add('active'); }
         function closeModal(id) { document.getElementById(id).classList.remove('active'); }
-        window.onload = () => { renderCalendar(); document.getElementById('userChatId').value = localStorage.getItem('apollo_chat_id') || ''; };
+
+        // ---------- 🔥 SWIPE GESTURE (left/right to change month) ----------
+        (function initSwipe() {
+            let touchStartX = 0;
+            let touchStartY = 0;
+            let touchEndX = 0;
+            const SWIPE_THRESHOLD = 55;
+            let isSwipingAllowed = true;   // avoid when modals are open
+            
+            const swipeZone = document.getElementById('swipeCalendarZone');
+            if (!swipeZone) return;
+            
+            // Hints: show toast for first few seconds
+            const toast = document.getElementById('swipeHelperToast');
+            if (toast) {
+                toast.classList.add('show');
+                setTimeout(() => toast.classList.remove('show'), 2800);
+                // also hide after first swipe
+                let hiddenOnce = false;
+                const hideToastOnSwipe = () => { if (!hiddenOnce && toast) { toast.classList.remove('show'); hiddenOnce = true; } };
+                document.body.addEventListener('touchstart', hideToastOnSwipe, { once: true });
+            }
+            
+            function isAnyModalActive() {
+                return document.getElementById('settingsModal').classList.contains('active') || 
+                       document.getElementById('dayModal').classList.contains('active');
+            }
+            
+            swipeZone.addEventListener('touchstart', (e) => {
+                if (isAnyModalActive()) {
+                    isSwipingAllowed = false;
+                    return;
+                }
+                isSwipingAllowed = true;
+                const touch = e.touches[0];
+                touchStartX = touch.clientX;
+                touchStartY = touch.clientY;
+                touchEndX = touchStartX;
+            }, { passive: false });
+            
+            swipeZone.addEventListener('touchmove', (e) => {
+                if (!isSwipingAllowed || isAnyModalActive()) return;
+                const touch = e.touches[0];
+                const deltaX = touch.clientX - touchStartX;
+                const deltaY = touch.clientY - touchStartY;
+                // if horizontal movement is more than vertical -> prevent page scroll for better UX
+                if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 12) {
+                    e.preventDefault();    // avoid vertical scroll while swiping month
+                }
+                touchEndX = touch.clientX;
+            }, { passive: false });
+            
+            swipeZone.addEventListener('touchend', (e) => {
+                if (!isSwipingAllowed || isAnyModalActive()) {
+                    touchStartX = 0;
+                    return;
+                }
+                const deltaX = touchEndX - touchStartX;
+                if (Math.abs(deltaX) > SWIPE_THRESHOLD) {
+                    if (deltaX > 0) {
+                        // swipe right → previous month
+                        changeMonth(-1);
+                        // subtle haptic feedback if supported
+                        if (window.navigator && window.navigator.vibrate) window.navigator.vibrate(20);
+                    } else {
+                        // swipe left → next month
+                        changeMonth(1);
+                        if (window.navigator && window.navigator.vibrate) window.navigator.vibrate(20);
+                    }
+                    // visual flash effect on the calendar grid
+                    const grid = document.getElementById('calendarGrid');
+                    if (grid) {
+                        grid.style.transition = 'background 0.1s';
+                        grid.style.backgroundColor = '#fef9c3';
+                        setTimeout(() => { grid.style.backgroundColor = ''; }, 150);
+                    }
+                }
+                touchStartX = 0;
+                touchEndX = 0;
+            });
+            
+            // also for mouse drag on desktop (optional)
+            let mouseStartX = 0, mouseMoved = false;
+            swipeZone.addEventListener('mousedown', (e) => {
+                if (isAnyModalActive()) return;
+                mouseStartX = e.clientX;
+                mouseMoved = false;
+                e.preventDefault();
+            });
+            window.addEventListener('mousemove', (e) => {
+                if (mouseStartX === 0 || isAnyModalActive()) return;
+                const diff = e.clientX - mouseStartX;
+                if (Math.abs(diff) > 8) mouseMoved = true;
+            });
+            window.addEventListener('mouseup', (e) => {
+                if (mouseStartX === 0 || isAnyModalActive()) { mouseStartX = 0; return; }
+                const delta = e.clientX - mouseStartX;
+                if (mouseMoved && Math.abs(delta) > SWIPE_THRESHOLD) {
+                    if (delta > 0) changeMonth(-1);
+                    else changeMonth(1);
+                }
+                mouseStartX = 0;
+                mouseMoved = false;
+            });
+        })();
+        
+        // initial load
+        window.onload = () => { 
+            renderCalendar(); 
+            document.getElementById('userChatId').value = localStorage.getItem('apollo_chat_id') || '';
+            // ensure no swipe interference from body
+        };
     </script>
 </body>
 </html>
-    
